@@ -148,7 +148,7 @@ input::placeholder { color: #3a3a50; }
 
 .result {
   margin-top: 1.5rem;
-  padding: 1rem 1.25rem;
+  padding: 1.25rem;
   background: rgba(52, 211, 153, 0.06);
   border: 1px solid rgba(52, 211, 153, 0.15);
   border-radius: 12px;
@@ -164,52 +164,68 @@ input::placeholder { color: #3a3a50; }
   margin-bottom: 0.75rem;
 }
 
-.link-block {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.link-block:last-child { margin-bottom: 0; }
-
-.link-tag {
-  flex-shrink: 0;
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 3px 8px;
-  border-radius: 6px;
-  white-space: nowrap;
-}
-
-.link-tag.full {
-  background: rgba(108, 99, 255, 0.12);
-  color: var(--accent);
-}
-
-.link-tag.short {
-  background: rgba(52, 211, 153, 0.12);
-  color: var(--success);
-}
-
-.link-text {
+.link-box {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   word-break: break-all;
   color: var(--text);
-  line-height: 1.5;
+  line-height: 1.6;
+  margin-bottom: 12px;
   cursor: pointer;
-  flex: 1;
+  transition: border-color 0.2s;
 }
 
-.link-text:hover { text-decoration: underline; }
+.link-box:hover { border-color: var(--accent); }
 
-.short-note {
+.btn-row {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-sm {
+  flex: 1;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-sm:hover { opacity: 0.85; }
+.btn-sm:active { transform: scale(0.97); }
+
+.btn-copy {
+  background: var(--success);
+  color: #0a0a0f;
+}
+
+.btn-shorten {
+  background: #fc3f1d;
+  color: #fff;
+}
+
+.btn-sm svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.hint {
+  margin-top: 10px;
   font-size: 0.75rem;
   color: var(--muted);
-  font-style: italic;
+  line-height: 1.5;
 }
 
 .error-msg {
@@ -239,19 +255,6 @@ input::placeholder { color: #3a3a50; }
   25% { transform: translateX(-6px); }
   75% { transform: translateX(6px); }
 }
-
-.spinner {
-  display: inline-block;
-  width: 12px; height: 12px;
-  border: 2px solid var(--muted);
-  border-top-color: var(--success);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-  vertical-align: middle;
-  margin-right: 6px;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .toast {
   position: fixed;
@@ -307,23 +310,19 @@ input::placeholder { color: #3a3a50; }
       <button class="btn" id="encrypt-btn" onclick="encrypt()">Зашифровать</button>
 
       <div class="result" id="result">
-        <div class="result-label">Готово — нажмите на ссылку, чтобы скопировать</div>
-        <div id="short-row" class="link-block" style="display:none">
-          <span class="link-tag short">clck.ru</span>
-          <span class="link-text" id="short-link" onclick="copyText(this)"></span>
+        <div class="result-label">Защищённая ссылка — нажмите, чтобы скопировать</div>
+        <div class="link-box" id="full-link" onclick="copyFull()"></div>
+        <div class="btn-row">
+          <button class="btn-sm btn-copy" onclick="copyFull()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span id="copy-label">Скопировать</span>
+          </button>
+          <button class="btn-sm btn-shorten" onclick="openShortener()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Сократить в clck.ru
+          </button>
         </div>
-        <div id="short-loading" class="link-block" style="display:none">
-          <span class="link-tag short">clck.ru</span>
-          <span class="short-note"><span class="spinner"></span> Сокращаю через Яндекс...</span>
-        </div>
-        <div id="short-fail" class="link-block" style="display:none">
-          <span class="link-tag short">clck.ru</span>
-          <span class="short-note">Не удалось сократить — используйте полную</span>
-        </div>
-        <div class="link-block">
-          <span class="link-tag full">Полная</span>
-          <span class="link-text" id="full-link" onclick="copyText(this)"></span>
-        </div>
+        <div class="hint">Кнопка «Сократить» скопирует ссылку и откроет clck.ru — вставьте и нажмите «Сократить»</div>
       </div>
     </div>
 
@@ -351,12 +350,7 @@ input::placeholder { color: #3a3a50; }
 <div class="toast" id="toast">Скопировано!</div>
 
 <script>
-/*
- * ===== НАСТРОЙКА =====
- * Укажите URL вашего GitHub Pages сайта:
- */
 const BASE_URL = 'https://dmitrybass1337.github.io/LinkLock/';
-/* ==================== */
 
 function getBaseUrl() {
   if (window.location.protocol === 'file:' || !window.location.origin || window.location.origin === 'null') {
@@ -368,6 +362,8 @@ function getBaseUrl() {
 function getParam(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
+
+let currentLink = '';
 
 function init() {
   const data = getParam('d');
@@ -384,106 +380,44 @@ function init() {
   }
 }
 
-function showToast() {
+function showToast(msg) {
   const t = document.getElementById('toast');
+  t.textContent = msg || 'Скопировано!';
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 1500);
 }
 
-function copyText(el) {
-  const text = el.textContent;
-  if (!text) return;
-  navigator.clipboard.writeText(text).then(showToast);
+function copyFull() {
+  if (!currentLink) return;
+  navigator.clipboard.writeText(currentLink).then(() => {
+    showToast('Ссылка скопирована!');
+    document.getElementById('copy-label').textContent = 'Скопировано!';
+    setTimeout(() => {
+      document.getElementById('copy-label').textContent = 'Скопировать';
+    }, 2000);
+  });
 }
 
-/* Fetch with timeout */
-function fetchWithTimeout(url, ms) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+function openShortener() {
+  if (!currentLink) return;
+  navigator.clipboard.writeText(currentLink).then(() => {
+    showToast('Ссылка скопирована — вставьте на clck.ru');
+    window.open('https://clck.ru/', '_blank');
+  });
 }
 
-/*
- * Сокращение через clck.ru (Яндекс)
- * API: https://clck.ru/--?url=LONG_URL → plain text
- * Из браузера напрямую CORS блокирует, поэтому пробуем через прокси
- */
-async function shortenUrl(longUrl) {
-  const clckApi = 'https://clck.ru/--?url=' + encodeURIComponent(longUrl);
-
-  const proxies = [
-    (apiUrl) => 'https://corsproxy.io/?' + encodeURIComponent(apiUrl),
-    (apiUrl) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(apiUrl),
-    (apiUrl) => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(apiUrl),
-  ];
-
-  /* Сначала пробуем напрямую (вдруг CORS разрешён) */
-  try {
-    const res = await fetchWithTimeout(clckApi, 4000);
-    if (res.ok) {
-      const text = (await res.text()).trim();
-      if (text.startsWith('https://clck.ru/')) return text;
-    }
-  } catch (e) {}
-
-  /* Пробуем через CORS-прокси */
-  for (const proxy of proxies) {
-    try {
-      const res = await fetchWithTimeout(proxy(clckApi), 5000);
-      if (res.ok) {
-        const text = (await res.text()).trim();
-        if (text.startsWith('https://clck.ru/')) return text;
-      }
-    } catch (e) { continue; }
-  }
-
-  /* Фоллбэк: is.gd */
-  try {
-    const res = await fetchWithTimeout(
-      'https://is.gd/create.php?format=simple&url=' + encodeURIComponent(longUrl), 5000
-    );
-    if (res.ok) {
-      const text = (await res.text()).trim();
-      if (text.startsWith('https://is.gd/')) return text;
-    }
-  } catch (e) {}
-
-  return null;
-}
-
-async function encrypt() {
+function encrypt() {
   const url = document.getElementById('url-input').value.trim();
   const pass = document.getElementById('pass-input').value;
   if (!url || !pass) return;
 
-  const btn = document.getElementById('encrypt-btn');
-  btn.disabled = true;
-  btn.textContent = 'Шифрую...';
-
   const encrypted = CryptoJS.AES.encrypt(url, pass).toString();
   const encoded = encodeURIComponent(btoa(encrypted));
   const base = getBaseUrl();
-  const fullLink = base + '?d=' + encoded;
+  currentLink = base + '?d=' + encoded;
 
   document.getElementById('result').style.display = 'block';
-  document.getElementById('full-link').textContent = fullLink;
-  document.getElementById('short-loading').style.display = 'flex';
-  document.getElementById('short-row').style.display = 'none';
-  document.getElementById('short-fail').style.display = 'none';
-
-  const shortUrl = await shortenUrl(fullLink);
-
-  document.getElementById('short-loading').style.display = 'none';
-
-  if (shortUrl) {
-    document.getElementById('short-link').textContent = shortUrl;
-    document.getElementById('short-row').style.display = 'flex';
-  } else {
-    document.getElementById('short-fail').style.display = 'flex';
-  }
-
-  btn.disabled = false;
-  btn.textContent = 'Зашифровать';
+  document.getElementById('full-link').textContent = currentLink;
 }
 
 function decrypt() {
