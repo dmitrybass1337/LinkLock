@@ -206,8 +206,8 @@ input::placeholder { color: #3a3a50; }
 
 .link-text:hover { text-decoration: underline; }
 
-.short-error {
-  font-size: 0.78rem;
+.short-note {
+  font-size: 0.75rem;
   color: var(--muted);
   font-style: italic;
 }
@@ -230,10 +230,7 @@ input::placeholder { color: #3a3a50; }
   color: var(--muted);
 }
 
-.footer a {
-  color: var(--accent);
-  text-decoration: none;
-}
+.footer a { color: var(--accent); text-decoration: none; }
 
 .shake { animation: shake 0.4s ease; }
 
@@ -293,7 +290,6 @@ input::placeholder { color: #3a3a50; }
       <span class="logo-text">LinkLock</span>
     </div>
 
-    <!-- CREATE MODE -->
     <div id="create-mode">
       <h1>Защитить ссылку</h1>
       <p class="subtitle">Зашифруйте ссылку паролем. Всё работает в браузере — ничего не хранится на сервере.</p>
@@ -312,9 +308,17 @@ input::placeholder { color: #3a3a50; }
 
       <div class="result" id="result">
         <div class="result-label">Готово — нажмите на ссылку, чтобы скопировать</div>
-        <div class="link-block">
-          <span class="link-tag short">Короткая</span>
-          <span id="short-link"></span>
+        <div id="short-row" class="link-block" style="display:none">
+          <span class="link-tag short">clck.ru</span>
+          <span class="link-text" id="short-link" onclick="copyText(this)"></span>
+        </div>
+        <div id="short-loading" class="link-block" style="display:none">
+          <span class="link-tag short">clck.ru</span>
+          <span class="short-note"><span class="spinner"></span> Сокращаю через Яндекс...</span>
+        </div>
+        <div id="short-fail" class="link-block" style="display:none">
+          <span class="link-tag short">clck.ru</span>
+          <span class="short-note">Не удалось сократить — используйте полную</span>
         </div>
         <div class="link-block">
           <span class="link-tag full">Полная</span>
@@ -323,7 +327,6 @@ input::placeholder { color: #3a3a50; }
       </div>
     </div>
 
-    <!-- UNLOCK MODE -->
     <div id="unlock-mode" style="display:none">
       <h1>Введите пароль</h1>
       <p class="subtitle">Эта ссылка защищена паролем. Введите его, чтобы продолжить.</p>
@@ -348,6 +351,20 @@ input::placeholder { color: #3a3a50; }
 <div class="toast" id="toast">Скопировано!</div>
 
 <script>
+/*
+ * ===== НАСТРОЙКА =====
+ * Укажите URL вашего GitHub Pages сайта:
+ */
+const BASE_URL = 'https://dmitrybass1337.github.io/LinkLock/';
+/* ==================== */
+
+function getBaseUrl() {
+  if (window.location.protocol === 'file:' || !window.location.origin || window.location.origin === 'null') {
+    return BASE_URL;
+  }
+  return window.location.origin + window.location.pathname;
+}
+
 function getParam(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
@@ -379,20 +396,58 @@ function copyText(el) {
   navigator.clipboard.writeText(text).then(showToast);
 }
 
+/* Fetch with timeout */
+function fetchWithTimeout(url, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
+/*
+ * Сокращение через clck.ru (Яндекс)
+ * API: https://clck.ru/--?url=LONG_URL → plain text
+ * Из браузера напрямую CORS блокирует, поэтому пробуем через прокси
+ */
 async function shortenUrl(longUrl) {
-  const apis = [
-    { url: 'https://is.gd/create.php?format=json&url=' + encodeURIComponent(longUrl), parse: r => r.shorturl },
-    { url: 'https://v.gd/create.php?format=json&url=' + encodeURIComponent(longUrl), parse: r => r.shorturl },
+  const clckApi = 'https://clck.ru/--?url=' + encodeURIComponent(longUrl);
+
+  const proxies = [
+    (apiUrl) => 'https://corsproxy.io/?' + encodeURIComponent(apiUrl),
+    (apiUrl) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(apiUrl),
+    (apiUrl) => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(apiUrl),
   ];
-  for (const api of apis) {
+
+  /* Сначала пробуем напрямую (вдруг CORS разрешён) */
+  try {
+    const res = await fetchWithTimeout(clckApi, 4000);
+    if (res.ok) {
+      const text = (await res.text()).trim();
+      if (text.startsWith('https://clck.ru/')) return text;
+    }
+  } catch (e) {}
+
+  /* Пробуем через CORS-прокси */
+  for (const proxy of proxies) {
     try {
-      const res = await fetch(api.url);
-      if (!res.ok) continue;
-      const json = await res.json();
-      const short = api.parse(json);
-      if (short) return short;
+      const res = await fetchWithTimeout(proxy(clckApi), 5000);
+      if (res.ok) {
+        const text = (await res.text()).trim();
+        if (text.startsWith('https://clck.ru/')) return text;
+      }
     } catch (e) { continue; }
   }
+
+  /* Фоллбэк: is.gd */
+  try {
+    const res = await fetchWithTimeout(
+      'https://is.gd/create.php?format=simple&url=' + encodeURIComponent(longUrl), 5000
+    );
+    if (res.ok) {
+      const text = (await res.text()).trim();
+      if (text.startsWith('https://is.gd/')) return text;
+    }
+  } catch (e) {}
+
   return null;
 }
 
@@ -407,25 +462,24 @@ async function encrypt() {
 
   const encrypted = CryptoJS.AES.encrypt(url, pass).toString();
   const encoded = encodeURIComponent(btoa(encrypted));
-  const base = window.location.origin + window.location.pathname;
+  const base = getBaseUrl();
   const fullLink = base + '?d=' + encoded;
 
-  const resultEl = document.getElementById('result');
-  const fullEl = document.getElementById('full-link');
-  const shortEl = document.getElementById('short-link');
-
-  resultEl.style.display = 'block';
-  fullEl.textContent = fullLink;
-  shortEl.innerHTML = '<span class="spinner"></span> <span style="color:var(--muted);font-size:0.8rem;">Сокращаю ссылку...</span>';
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('full-link').textContent = fullLink;
+  document.getElementById('short-loading').style.display = 'flex';
+  document.getElementById('short-row').style.display = 'none';
+  document.getElementById('short-fail').style.display = 'none';
 
   const shortUrl = await shortenUrl(fullLink);
 
+  document.getElementById('short-loading').style.display = 'none';
+
   if (shortUrl) {
-    shortEl.className = 'link-text';
-    shortEl.textContent = shortUrl;
-    shortEl.onclick = function() { copyText(this); };
+    document.getElementById('short-link').textContent = shortUrl;
+    document.getElementById('short-row').style.display = 'flex';
   } else {
-    shortEl.innerHTML = '<span class="short-error">Не удалось сократить — скопируйте полную</span>';
+    document.getElementById('short-fail').style.display = 'flex';
   }
 
   btn.disabled = false;
